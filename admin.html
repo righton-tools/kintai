@@ -17,7 +17,8 @@
 body{font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;margin:0;background:#f4f5f7;color:#222}
 header{background:linear-gradient(135deg,#14161c,#2b3445);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 14px;position:sticky;top:0;z-index:2}
 header h1{font-size:18px;margin:0}header small{opacity:.8}
-.wrap{padding:12px 12px calc(env(safe-area-inset-bottom,0px) + 20px);max-width:720px;margin:0 auto}
+.sw{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14px);right:14px;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;text-decoration:none}
+.wrap{padding:12px 12px 0;max-width:720px;margin:0 auto}
 .card{background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .card h2{font-size:15px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #eee;font-size:14px;gap:8px}
@@ -31,15 +32,27 @@ header h1{font-size:18px;margin:0}header small{opacity:.8}
 table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{padding:6px 4px;text-align:right;border-top:1px solid #eee;white-space:nowrap}th{color:#666;font-weight:600}td:first-child,th:first-child{text-align:left}
 .scroll{overflow-x:auto}
 .err{color:#c5221f;padding:20px;text-align:center;font-weight:700}
+.f{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin:6px 0;font-size:13px}
+.f input[type=date]{font:inherit;padding:5px 6px;border:1px solid #ccd3dd;border-radius:8px;background:#fff}
+.chk{display:inline-flex;align-items:center;gap:3px;background:#f1f3f6;border-radius:999px;padding:5px 10px}
+.lab{font-size:12px;color:#666;font-weight:700;margin-top:8px}
+.btn2{border:1px solid #2b3445;background:#fff;color:#2b3445;border-radius:8px;padding:6px 10px;font-size:13px;font-family:inherit}
+#exp{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px)}
 </style>
 </head>
 <body>
-<header><h1>勤怠 管理画面</h1><small id="now">読み込み中...</small></header>
+<header><a class="sw" id="sw" hidden>◀ 打刻</a><h1>勤怠 管理画面</h1><small id="now">読み込み中...</small></header>
 <div class="wrap" id="app"></div>
+<div class="wrap" id="exp" style="padding-top:0"></div>
 <script>
 const API='https://script.google.com/macros/s/AKfycbwO-QQFeXJoUUeC4ZLf7Hy2Kvh9sF6n8Qg1gIQev7nVemzRhZHTqj_hLs7SoEWgXA8Y/exec';
-let AKEY=(new URLSearchParams(location.search).get('a')||'').replace(/[^A-Za-z0-9]/g,'');
-try{ if(AKEY){localStorage.setItem('kintai_admin_key',AKEY);} else {AKEY=localStorage.getItem('kintai_admin_key')||'';} }catch(e){}
+const QS=new URLSearchParams(location.search);
+const clean=s=>(s||'').replace(/[^A-Za-z0-9]/g,'');
+const EKEY=clean(QS.get('k'));
+let AKEY=clean(QS.get('a'));
+try{ if(AKEY){localStorage.setItem('kintai_admin_key',AKEY);} else if(!EKEY){AKEY=localStorage.getItem('kintai_admin_key')||'';} }catch(e){}
+if(!AKEY&&EKEY) AKEY=EKEY;
+if(EKEY){const s=document.getElementById('sw');s.href='./?k='+EKEY;s.hidden=false;}
 let YM='';
 function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
 function card(title,right){const c=el('div','card');const h=el('h2');h.appendChild(el('span','',title));if(right)h.appendChild(right);c.appendChild(h);return c;}
@@ -72,7 +85,61 @@ function render(d){
   c=card('有給');
   d.leave.forEach(x=>{const r=row(x.name,'残 '+(x.remain===''?'-':x.remain)+'日'+(x.deadline?'／期限 '+x.deadline:'')+(x.memo?'／'+x.memo:''),x.judge,'tag');const t=r.lastChild;t.style.background=x.color;t.style.whiteSpace='normal';t.style.maxWidth='55%';t.style.textAlign='right';c.appendChild(r);});
   app.appendChild(c);
+  buildExport(d.todayList.map(x=>x.name));
 }
+const COLS=[['date','日付'],['name','氏名'],['company','会社'],['kubun','区分'],['in','出勤'],['out','退勤'],['brk','休憩(h)'],['work','実働(h)'],['otD','時間外_日8h超(h)'],['otW','時間外_週40h超(h)'],['hol','休日労働_日曜(h)'],['night','深夜_22-5時(h)'],['leave','有給(日)'],['approve','早出承認'],['note','備考']];
+const NUMS=['brk','work','otD','otW','hol','night','leave'];
+let EXP=null;
+function call(fn,args){return fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args}),redirect:'follow'}).then(r=>r.json()).then(j=>{if(!j.ok)throw new Error(j.error||'エラーが起きました');return j.data;});}
+function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function chk(cls,val,label,on){const l=el('label','chk');const i=el('input');i.type='checkbox';i.className=cls;i.value=val;i.checked=on;l.appendChild(i);l.appendChild(document.createTextNode(label));return l;}
+function buildExport(names){
+  const box=document.getElementById('exp'); if(box.childNodes.length) return;
+  const c=card('データ抽出・エクスポート');
+  const n=new Date();
+  c.appendChild(el('div','lab','期間'));
+  const f1=el('div','f');const a=el('input');a.type='date';a.id='exFrom';a.value=iso(new Date(n.getFullYear(),n.getMonth(),1));const b=el('input');b.type='date';b.id='exTo';b.value=iso(n);
+  f1.appendChild(a);f1.appendChild(document.createTextNode('〜'));f1.appendChild(b);c.appendChild(f1);
+  c.appendChild(el('div','lab','人'));
+  const f2=el('div','f');f2.appendChild(chk('exAll','','全員',true));names.forEach(x=>f2.appendChild(chk('exN',x,x,false)));c.appendChild(f2);
+  c.appendChild(el('div','lab','項目'));
+  const f3=el('div','f');COLS.forEach(x=>f3.appendChild(chk('exC',x[0],x[1],true)));c.appendChild(f3);
+  const f4=el('div','f');
+  const go=el('button','btn','抽出する');go.onclick=runExport;f4.appendChild(go);
+  const sv=el('button','btn2','CSVで保存');sv.onclick=saveCSV;f4.appendChild(sv);
+  const sh=el('button','btn2','共有・送る');sh.onclick=shareCSV;f4.appendChild(sh);
+  const cp=el('button','btn2','コピー');cp.onclick=copyTSV;f4.appendChild(cp);
+  c.appendChild(f4);
+  c.appendChild(el('div','sub','「人」は個別に選ぶと全員のチェックが外れます。CSVはExcelで開けます。'));
+  const info=el('div','sub');info.id='exInfo';info.style.margin='8px 0 4px';c.appendChild(info);
+  const sc=el('div','scroll');const tb=el('table');tb.id='exTb';sc.appendChild(tb);c.appendChild(sc);
+  box.appendChild(c);
+  f2.addEventListener('change',e=>{const all=f2.querySelector('.exAll');if(e.target.classList.contains('exN')&&e.target.checked)all.checked=false;if(e.target===all&&all.checked)f2.querySelectorAll('.exN').forEach(x=>x.checked=false);});
+  f3.addEventListener('change',drawExport);
+}
+function selCols(){const on=[...document.querySelectorAll('.exC')].filter(x=>x.checked).map(x=>x.value);return COLS.filter(x=>on.indexOf(x[0])>=0);}
+function exInfo(t,bad){const i=document.getElementById('exInfo');i.textContent=t;i.className=bad?'warn':'sub';}
+function runExport(){
+  const from=document.getElementById('exFrom').value.replace(/-/g,'/'),to=document.getElementById('exTo').value.replace(/-/g,'/');
+  const all=document.querySelector('.exAll').checked;const names=all?[]:[...document.querySelectorAll('.exN')].filter(x=>x.checked).map(x=>x.value);
+  if(!from||!to){exInfo('期間を入れてください',true);return;}
+  if(!all&&!names.length){exInfo('人を選んでください',true);return;}
+  exInfo('抽出中...');
+  call('getAdminExport',[AKEY,from,to,names]).then(d=>{EXP=d;drawExport();}).catch(e=>exInfo(/fetch|JSON|Load/i.test(e.message)?'通信できませんでした。もう一度押してください':e.message,true));
+}
+function totals(cols){const t={};NUMS.forEach(k=>t[k]=Math.round(EXP.rows.reduce((a,r)=>a+(Number(r[k])||0),0)*100)/100);return cols.map((c,i)=>i===0?'合計':(NUMS.indexOf(c[0])>=0?t[c[0]]:''));}
+function matrix(){const cols=selCols();const m=[cols.map(c=>c[1])];EXP.rows.forEach(r=>m.push(cols.map(c=>r[c[0]])));if(cols.length&&EXP.rows.length)m.push(totals(cols));return m;}
+function drawExport(){
+  if(!EXP)return;const tb=document.getElementById('exTb');tb.innerHTML='';const m=matrix();const MAX=200;
+  m.forEach((row,i)=>{if(i>MAX&&i<m.length-1)return;const tr=el('tr');row.forEach(v=>tr.appendChild(el(i===0?'th':'td','',String(v))));if(i===m.length-1&&i>0)tr.style.fontWeight='700';tb.appendChild(tr);});
+  exInfo(EXP.from+' 〜 '+EXP.to+'：'+EXP.count+'件'+(EXP.count>MAX?'（画面は先頭'+MAX+'件まで。保存すると全件入ります）':'')+(EXP.count?'':'　この条件のデータはありません'));
+}
+function csvText(sep){return matrix().map(r=>r.map(v=>{v=String(v);return sep===','&&/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v.replace(/[\t\n]/g,' ');}).join(sep)).join('\r\n')+'\r\n';}
+function csvFile(){return new File(['﻿'+csvText(',')],'勤怠_'+EXP.from.replace(/\//g,'')+'-'+EXP.to.replace(/\//g,'')+'.csv',{type:'text/csv'});}
+function need(){if(!EXP){exInfo('先に「抽出する」を押してください',true);return true;}return false;}
+function saveCSV(){if(need())return;const f=csvFile();const u=URL.createObjectURL(f);const a=el('a');a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);}
+function shareCSV(){if(need())return;const f=csvFile();if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:f.name}).catch(()=>{});}else{exInfo('この端末は共有に対応していません。「CSVで保存」か「コピー」を使ってください',true);}}
+function copyTSV(){if(need())return;navigator.clipboard.writeText(csvText('\t')).then(()=>exInfo('コピーしました。Excelやスプレッドシートにそのまま貼れます')).catch(()=>exInfo('コピーできませんでした。「CSVで保存」を使ってください',true));}
 function load(ym){
   const app=document.getElementById('app');
   if(!AKEY){app.innerHTML='';app.appendChild(el('div','err','管理者用のリンクから開いてください'));return;}

@@ -21,7 +21,9 @@
   .top h1{font-size:14px;font-weight:600;letter-spacing:.3em;margin:0 0 10px;opacity:.85}
   .clock{font-size:60px;font-weight:700;letter-spacing:2px;margin:0;line-height:1.05;font-variant-numeric:tabular-nums}
   .date{margin:6px 0 0;font-size:14px;opacity:.85}
-  .wrap{max-width:440px;margin:-36px auto 0;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 28px)}
+  .top{position:relative}
+  .sw{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;text-decoration:none}
+  .wrap{position:relative;z-index:1;max-width:440px;margin:-36px auto 0;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 28px)}
   .who{background:#fff;border-radius:16px;padding:14px;text-align:center;font-size:21px;font-weight:700;box-shadow:0 4px 14px rgba(20,40,80,.10);margin-bottom:16px}
   .who small{display:block;font-size:12px;color:#7a8494;font-weight:400;margin-top:2px}
   .btns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -41,6 +43,7 @@
 </head>
 <body>
 <div class="top">
+  <a class="sw" id="sw" hidden>管理画面 ▶</a>
   <h1>勤怠打刻</h1>
   <p class="clock" id="clock">--:--</p>
   <p class="date" id="date"></p>
@@ -91,7 +94,7 @@
   async function init(){
     setBusy(true);
     if(!KEY){setWho('—','本人確認できません');msg('本人用のQRから開いてください',false);return;}
-    try{const me=await api('getMe',[KEY]);setWho(me.name,(me.company?me.company+'　':'')+me.kubun);show(me);setBusy(false);if(me.warn)msg(me.warn,false);}
+    try{const me=await api('getMe',[KEY]);setWho(me.name,(me.company?me.company+'　':'')+me.kubun);show(me);setBusy(false);if(me.warn)msg(me.warn,false);if(me.admin){const s=$('sw');s.href='admin.html?k='+KEY;s.hidden=false;}}
     catch(e){setWho('—','本人確認できません');msg(e.message,false);}
   }
   init();
