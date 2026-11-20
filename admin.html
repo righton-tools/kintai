@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>勤怠 管理画面</title>
+<meta name="theme-color" content="#14161c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="勤怠管理">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="admin.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="kanri-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="kanri-180.png">
+<style>
+body{font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;margin:0;background:#f4f5f7;color:#222}
+header{background:linear-gradient(135deg,#14161c,#2b3445);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 14px;position:sticky;top:0;z-index:2}
+header h1{font-size:18px;margin:0}header small{opacity:.8}
+.wrap{padding:12px 12px calc(env(safe-area-inset-bottom,0px) + 20px);max-width:720px;margin:0 auto}
+.card{background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.card h2{font-size:15px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #eee;font-size:14px;gap:8px}
+.card h2+.row{border-top:0}
+.sub{font-size:12px;color:#777}
+.tag{font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.in{background:#e6f4ea;color:#137333}.done{background:#e8eaed;color:#444}.none{background:#fff;color:#999;border:1px solid #ddd}
+.warn{color:#c5221f;font-weight:700}
+.btn{border:0;background:#2b3445;font-family:inherit;color:#fff;border-radius:8px;padding:6px 10px;font-size:13px}
+.empty{color:#999;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{padding:6px 4px;text-align:right;border-top:1px solid #eee;white-space:nowrap}th{color:#666;font-weight:600}td:first-child,th:first-child{text-align:left}
+.scroll{overflow-x:auto}
+.err{color:#c5221f;padding:20px;text-align:center;font-weight:700}
+</style>
+</head>
+<body>
+<header><h1>勤怠 管理画面</h1><small id="now">読み込み中...</small></header>
+<div class="wrap" id="app"></div>
+<script>
+const API='https://script.google.com/macros/s/AKfycbwO-QQFeXJoUUeC4ZLf7Hy2Kvh9sF6n8Qg1gIQev7nVemzRhZHTqj_hLs7SoEWgXA8Y/exec';
+let AKEY=(new URLSearchParams(location.search).get('a')||'').replace(/[^A-Za-z0-9]/g,'');
+try{ if(AKEY){localStorage.setItem('kintai_admin_key',AKEY);} else {AKEY=localStorage.getItem('kintai_admin_key')||'';} }catch(e){}
+let YM='';
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
+function card(title,right){const c=el('div','card');const h=el('h2');h.appendChild(el('span','',title));if(right)h.appendChild(right);c.appendChild(h);return c;}
+function row(left,sub,right,rcls){const r=el('div','row');const l=el('div');l.appendChild(el('div','',left));if(sub)l.appendChild(el('div','sub',sub));r.appendChild(l);if(right!=null)r.appendChild(el('span',rcls||'',right));return r;}
+function ymLabel(ym){const p=ym.split('/');return p[0]+'年'+Number(p[1])+'月';}
+function shiftYM(n){const p=YM.split('/').map(Number);const d=new Date(p[0],p[1]-1+n,1);load(d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0'));}
+function render(d){
+  YM=d.ym; document.getElementById('now').textContent=d.now+' 時点';
+  const app=document.getElementById('app'); app.innerHTML='';
+  const rb=el('button','btn','更新'); rb.onclick=()=>load(YM);
+  let c=card('今日の出勤状況',rb);
+  d.todayList.forEach(x=>c.appendChild(row(x.name,x.company+(x.detail?'　'+x.detail:''),x.st,'tag '+x.cls)));
+  app.appendChild(c);
+  c=card('要修正（退勤の押し忘れ）');
+  if(!d.fixes.length) c.appendChild(el('div','empty','なし'));
+  d.fixes.forEach(x=>c.appendChild(row(x.date+'　'+x.name,'出勤 '+x.in+'／退勤なし','シートで修正','warn')));
+  app.appendChild(c);
+  const nav=el('span');const pv=el('button','btn','◀');pv.onclick=()=>shiftYM(-1);const nx=el('button','btn','▶');nx.onclick=()=>shiftYM(1);nav.appendChild(pv);nav.appendChild(document.createTextNode(' '));nav.appendChild(nx);
+  c=card(ymLabel(d.ym)+'の残業（時間）',nav);
+  const sc=el('div','scroll');const tb=el('table');const hr=el('tr');
+  ['氏名','出勤日','実働','時間外','固定','超過','休日','深夜'].forEach(h=>hr.appendChild(el('th','',h)));tb.appendChild(hr);
+  d.month.forEach(x=>{const tr=el('tr');[x.name,x.days,x.work,x.ot,x.fixed===''?'未設定':x.fixed,x.over===''?'-':x.over,x.hol,x.night].forEach((v,i)=>{const td=el('td','',String(v));if(i===5&&x.over>0)td.className='warn';tr.appendChild(td);});tb.appendChild(tr);});
+  sc.appendChild(tb);c.appendChild(sc);
+  c.appendChild(el('div','sub','時間外＝1日8時間超＋週40時間超。固定＝固定残業の時間数。超過が出たら別途支給。休日（日曜）・深夜は固定残業とは別の割増。'));
+  app.appendChild(c);
+  c=card('早出（承認なし）'+ymLabel(d.ym));
+  if(!d.early.length) c.appendChild(el('div','empty','なし'));
+  d.early.forEach(x=>c.appendChild(row(x.date+'　'+x.name,x.in+' 打刻→9:00から計算','承認はシートで','sub')));
+  app.appendChild(c);
+  c=card('有給');
+  d.leave.forEach(x=>{const r=row(x.name,'残 '+(x.remain===''?'-':x.remain)+'日'+(x.deadline?'／期限 '+x.deadline:'')+(x.memo?'／'+x.memo:''),x.judge,'tag');const t=r.lastChild;t.style.background=x.color;t.style.whiteSpace='normal';t.style.maxWidth='55%';t.style.textAlign='right';c.appendChild(r);});
+  app.appendChild(c);
+}
+function load(ym){
+  const app=document.getElementById('app');
+  if(!AKEY){app.innerHTML='';app.appendChild(el('div','err','管理者用のリンクから開いてください'));return;}
+  document.getElementById('now').textContent='読み込み中...';
+  fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'getAdminData',args:[AKEY,ym||'']}),redirect:'follow'})
+    .then(r=>r.json()).then(j=>{ if(!j.ok) throw new Error(j.error||'エラーが起きました'); render(j.data); })
+    .catch(e=>{app.innerHTML='';app.appendChild(el('div','err',(e&&e.message&&!/fetch|JSON|Load/i.test(e.message))?e.message:'通信できませんでした。電波を確認して開き直してください'));document.getElementById('now').textContent='';});
+}
+load('');
+</script>
+</body>
+</html>

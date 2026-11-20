@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>勤怠打刻</title>
+<meta name="theme-color" content="#1b2a4a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="打刻">
+<meta name="robots" content="noindex,nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="dakoku-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="dakoku-180.png">
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;background:#eef1f5;color:#1c2330}
+  .top{background:linear-gradient(135deg,#1b2a4a,#0f7c8c);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 22px) 20px 54px;text-align:center;border-radius:0 0 28px 28px}
+  .top h1{font-size:14px;font-weight:600;letter-spacing:.3em;margin:0 0 10px;opacity:.85}
+  .clock{font-size:60px;font-weight:700;letter-spacing:2px;margin:0;line-height:1.05;font-variant-numeric:tabular-nums}
+  .date{margin:6px 0 0;font-size:14px;opacity:.85}
+  .wrap{max-width:440px;margin:-36px auto 0;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 28px)}
+  .who{background:#fff;border-radius:16px;padding:14px;text-align:center;font-size:21px;font-weight:700;box-shadow:0 4px 14px rgba(20,40,80,.10);margin-bottom:16px}
+  .who small{display:block;font-size:12px;color:#7a8494;font-weight:400;margin-top:2px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .btn{border:0;border-radius:18px;color:#fff;font-size:24px;font-weight:700;padding:30px 0;box-shadow:0 6px 14px rgba(20,40,80,.18);font-family:inherit;letter-spacing:.15em}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 6px rgba(20,40,80,.2)}
+  .in{background:linear-gradient(135deg,#17a2a0,#1fbf9c)}
+  .out{background:linear-gradient(135deg,#2b3a5c,#40507a)}
+  .btn:disabled{opacity:.4}
+  .msg{text-align:center;min-height:44px;margin:14px 4px;font-weight:700;font-size:15px;line-height:1.5}
+  .ok{color:#137a5a}.ng{color:#c5221f}
+  .status{background:#fff;border-radius:16px;padding:6px 16px;box-shadow:0 4px 14px rgba(20,40,80,.06)}
+  .status div{display:flex;justify-content:space-between;padding:11px 0;border-top:1px solid #eef0f3;font-size:15px}
+  .status div:first-child{border-top:0}
+  .status b{color:#7a8494;font-weight:500}
+  .status span{font-weight:700;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>勤怠打刻</h1>
+  <p class="clock" id="clock">--:--</p>
+  <p class="date" id="date"></p>
+</div>
+<div class="wrap">
+  <div class="who" id="who">確認中...<small></small></div>
+  <div class="btns">
+    <button class="btn in" id="btnIn" onclick="punch('出勤')">出勤</button>
+    <button class="btn out" id="btnOut" onclick="punch('退勤')">退勤</button>
+  </div>
+  <div class="msg" id="msg"></div>
+  <div class="status">
+    <div><b>日付</b><span id="sDate">-</span></div>
+    <div><b>出勤</b><span id="sIn">-</span></div>
+    <div><b>退勤</b><span id="sOut">-</span></div>
+    <div><b>実働</b><span id="sHours">-</span></div>
+  </div>
+</div>
+<script>
+  const API='https://script.google.com/macros/s/AKfycbwO-QQFeXJoUUeC4ZLf7Hy2Kvh9sF6n8Qg1gIQev7nVemzRhZHTqj_hLs7SoEWgXA8Y/exec';
+  const $=id=>document.getElementById(id);
+  const wd=['日','月','火','水','木','金','土'];
+  let KEY=(new URLSearchParams(location.search).get('k')||'').replace(/[^A-Za-z0-9]/g,'');
+  try{ if(KEY){localStorage.setItem('kintai_key',KEY);} else {KEY=localStorage.getItem('kintai_key')||'';} }catch(e){}
+  async function api(fn,args){
+    let r;
+    try{ r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args}),redirect:'follow'}); }
+    catch(e){ throw new Error('通信できませんでした。電波を確認して、もう一度押してください'); }
+    let j;
+    try{ j=await r.json(); }catch(e){ throw new Error('通信できませんでした。もう一度押してください'); }
+    if(!j.ok) throw new Error(j.error||'エラーが起きました');
+    return j.data;
+  }
+  function tick(){const n=new Date();$('clock').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+    $('date').textContent=n.getFullYear()+'年'+(n.getMonth()+1)+'月'+n.getDate()+'日（'+wd[n.getDay()]+'）';}
+  tick();setInterval(tick,10000);
+  function setBusy(b){$('btnIn').disabled=b;$('btnOut').disabled=b;}
+  function show(s){$('sDate').textContent=s.date||'-';$('sIn').textContent=s.in||'-';$('sOut').textContent=s.out||'-';$('sHours').textContent=s.hours?s.hours+' 時間':'-';}
+  function msg(t,ok){const m=$('msg');m.textContent=t;m.className='msg '+(ok?'ok':'ng');}
+  function setWho(name,sub){const w=$('who');w.textContent=name;const s=document.createElement('small');s.textContent=sub;w.appendChild(s);}
+  async function punch(type){
+    if(!KEY){msg('本人用のQRから開いてください',false);return;}
+    setBusy(true);msg('送信中...',true);
+    try{const r=await api('punch',[KEY,type]);msg(type+'を記録しました（'+r.time+'）',true);show(r);}
+    catch(e){msg(e.message,false);}
+    setBusy(false);
+  }
+  async function init(){
+    setBusy(true);
+    if(!KEY){setWho('—','本人確認できません');msg('本人用のQRから開いてください',false);return;}
+    try{const me=await api('getMe',[KEY]);setWho(me.name,(me.company?me.company+'　':'')+me.kubun);show(me);setBusy(false);if(me.warn)msg(me.warn,false);}
+    catch(e){setWho('—','本人確認できません');msg(e.message,false);}
+  }
+  init();
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden){tick(); if(KEY) api('getMe',[KEY]).then(me=>{show(me);if(me.warn)msg(me.warn,false);}).catch(()=>{});} });
+</script>
+</body>
+</html>
