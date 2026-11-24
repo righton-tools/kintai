@@ -242,5 +242,44 @@ function load(ym){
 }
 load('');
 </script>
+<div class="wrap" id="push" style="padding-top:0"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<script>
+(function(){
+  const VAPID='BIPmGhpaX7hUD5_cD9irMC8CKo4CXwog_7EIehkEjM-tkU5Llk9yx9QmXf7FAxu8_XCYqzvhd9l-3Zse3p0Qg3s';
+  const CFG={apiKey:'AIzaSyD-ACBznqdwv_5SiFdO32ii_SSSTFSVqAc',authDomain:'right-on-pos.firebaseapp.com',projectId:'right-on-pos',messagingSenderId:'159713993799',appId:'1:159713993799:web:39210634f514f9c91b7d62'};
+  const box=document.getElementById('push');
+  if(!AKEY) return;
+  const card=el('div','card');box.appendChild(card);
+  card.appendChild(el('div','', '🔔 退勤忘れの通知'));card.firstChild.style.fontWeight='700';
+  const info=el('div','', '19:30を過ぎても退勤が押されていない人がいると、このスマホに通知が届きます（本人には届きません）。');
+  info.style.cssText='font-size:13px;color:#555;margin:6px 0 10px';card.appendChild(info);
+  const st=el('div','');st.style.cssText='font-size:13px;margin-bottom:8px';card.appendChild(st);
+  const b1=el('button','', '通知を受け取る'),b2=el('button','', 'テスト通知を送る');
+  [b1,b2].forEach(b=>{b.style.cssText='display:block;width:100%;padding:12px;border:0;border-radius:10px;font-size:15px;font-weight:700;margin-top:6px;background:#1a73e8;color:#fff';card.appendChild(b);});
+  b2.style.background='#e8f0fe';b2.style.color='#1a73e8';
+  const say=(t,bad)=>{st.textContent=t;st.style.color=bad?'#d93025':'#188038';};
+  let TOKEN='';try{TOKEN=localStorage.getItem('kintai_push_token')||'';}catch(e){}
+  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent), standalone=window.navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+  if(!('Notification' in window)||!('serviceWorker' in navigator)){
+    say(ios&&!standalone?'iPhoneは「ホーム画面に追加」したアプリから開くと設定できます（共有ボタン →「ホーム画面に追加」）':'この端末・ブラウザは通知に対応していません',true);b1.hidden=b2.hidden=true;return;}
+  b2.hidden=!(TOKEN&&Notification.permission==='granted');
+  if(TOKEN&&Notification.permission==='granted'){say('このスマホは通知を受け取る設定になっています');b1.textContent='設定し直す';}
+  else if(Notification.permission==='denied'){say('通知がブロックされています。スマホの設定でこのアプリの通知を「許可」にしてから押してください',true);}
+  async function post(fn,args){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args}),redirect:'follow'});const j=await r.json();if(!j.ok)throw new Error(j.error||'エラー');return j.data;}
+  b1.onclick=async()=>{b1.disabled=true;say('設定中...');
+    try{const p=await Notification.requestPermission();if(p!=='granted')throw new Error('通知が許可されませんでした。スマホの設定で許可してください');
+      if(!firebase.apps.length)firebase.initializeApp(CFG);
+      const reg=await navigator.serviceWorker.register('firebase-messaging-sw.js');await navigator.serviceWorker.ready;
+      const t=await firebase.messaging().getToken({vapidKey:VAPID,serviceWorkerRegistration:reg});
+      if(!t)throw new Error('通知の登録に失敗しました。もう一度押してください');
+      await post('registerPush',[AKEY,t,navigator.userAgent]);TOKEN=t;try{localStorage.setItem('kintai_push_token',t);}catch(e){}
+      say('設定できました。「テスト通知を送る」で確認できます');b2.hidden=false;b1.textContent='設定し直す';
+    }catch(e){say(e.message||'設定できませんでした',true);}finally{b1.disabled=false;}};
+  b2.onclick=async()=>{b2.disabled=true;say('送信中...');
+    try{await post('pushTest',[AKEY,TOKEN]);say('テスト通知を送りました。数秒で届きます');}catch(e){say(e.message,true);}finally{b2.disabled=false;}};
+})();
+</script>
 </body>
 </html>
