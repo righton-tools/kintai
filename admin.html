@@ -14,6 +14,25 @@
 <link rel="icon" type="image/png" sizes="192x192" href="kanri-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="kanri-180.png">
 <style>
+[hidden]{display:none!important}
+.pend{border:2px solid #f08c2e;box-shadow:0 4px 16px rgba(240,140,46,.18)}
+.pend h2{color:#c2410c;font-size:17px}
+.pend.none{border:1px solid #e3e6ea;box-shadow:none}.pend.none h2{color:#6b7280;font-size:14px}
+.pi{border-top:1px solid #f1e3d3;padding:10px 0}
+.pi:first-of-type{border-top:0}
+.pi b{font-size:15px}
+.pi .sub{margin-top:3px;line-height:1.5}
+.ab{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.ok2{border:0;background:#137a5a;color:#fff;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:700;font-family:inherit}
+.ng2{border:1px solid #b3261e;background:#fff;color:#b3261e;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:700;font-family:inherit}
+.rs{width:100%;box-sizing:border-box;font:inherit;font-size:15px;padding:9px 10px;border:1px solid #cfd6e0;border-radius:10px;margin-top:8px}
+.fx label{display:block;font-size:12px;color:#666;font-weight:700;margin:8px 0 3px}
+.fx select,.fx input[type=date],.fx input[type=time]{font:inherit;font-size:15px;padding:7px 8px;border:1px solid #cfd6e0;border-radius:10px;background:#fff;width:100%;box-sizing:border-box}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mini2{border:1px solid #2b3445;background:#fff;color:#2b3445;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;font-family:inherit}
+.hist{font-size:12.5px;padding:8px 0;border-top:1px solid #eee}
+.hist:first-of-type{border-top:0}
+.role{display:inline-block;font-size:11px;background:rgba(255,255,255,.18);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:2px}
 body{font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;margin:0;background:#f4f5f7;color:#222}
 header{background:linear-gradient(135deg,#14161c,#2b3445);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px 14px;position:sticky;top:0;z-index:2}
 header h1{font-size:18px;margin:0}header small{opacity:.8}
@@ -60,16 +79,22 @@ function row(left,sub,right,rcls){const r=el('div','row');const l=el('div');l.ap
 function ymLabel(ym){const p=ym.split('/');return p[0]+'年'+Number(p[1])+'月';}
 function shiftYM(n){const p=YM.split('/').map(Number);const d=new Date(p[0],p[1]-1+n,1);load(d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0'));}
 function render(d){
-  YM=d.ym; document.getElementById('now').textContent=d.now+' 時点';
+  YM=d.ym; DATA=d; document.getElementById('now').textContent=d.now+' 時点';
+  document.querySelector('header h1').innerHTML='';document.querySelector('header h1').appendChild(document.createTextNode('勤怠 管理画面'));
+  if(d.me){const r=el('span','role',d.me.role==='owner'?'オーナー':'責任者・'+d.me.company);document.querySelector('header h1').appendChild(r);}
   const app=document.getElementById('app'); app.innerHTML='';
+  renderPending(app,d);
   const rb=el('button','btn','更新'); rb.onclick=()=>load(YM);
   let c=card('今日の出勤状況',rb);
   d.todayList.forEach(x=>c.appendChild(row(x.name,x.company+(x.detail?'　'+x.detail:''),x.st,'tag '+x.cls)));
   app.appendChild(c);
   c=card('要修正（退勤の押し忘れ）');
   if(!d.fixes.length) c.appendChild(el('div','empty','なし'));
-  d.fixes.forEach(x=>c.appendChild(row(x.date+'　'+x.name,'出勤 '+x.in+'／退勤なし','シートで修正','warn')));
+  d.fixes.forEach(x=>{const r=row(x.date+'　'+x.name,'出勤 '+x.in+'／退勤なし',null);
+    if(canEdit(x.name)){const b=el('button','mini2','直す');b.onclick=()=>openFixForm(x.name,x.date);r.appendChild(b);}else r.appendChild(el('span','sub','オーナーが修正'));
+    c.appendChild(r);});
   app.appendChild(c);
+  renderFixForm(app,d);
   const nav=el('span');const pv=el('button','btn','◀');pv.onclick=()=>shiftYM(-1);const nx=el('button','btn','▶');nx.onclick=()=>shiftYM(1);nav.appendChild(pv);nav.appendChild(document.createTextNode(' '));nav.appendChild(nx);
   c=card(ymLabel(d.ym)+'の残業（時間）',nav);
   const sc=el('div','scroll');const tb=el('table');const hr=el('tr');
@@ -80,12 +105,79 @@ function render(d){
   app.appendChild(c);
   c=card('早出（承認なし）'+ymLabel(d.ym));
   if(!d.early.length) c.appendChild(el('div','empty','なし'));
-  d.early.forEach(x=>c.appendChild(row(x.date+'　'+x.name,x.in+' 打刻→9:00から計算','承認はシートで','sub')));
+  d.early.forEach(x=>{const r=row(x.date+'　'+x.name,x.in+' 打刻→9:00から計算',null);
+    if(canEdit(x.name)){const b=el('button','mini2','早出を承認');b.onclick=()=>approveEarly(x.name,x.date,b);r.appendChild(b);}else r.appendChild(el('span','sub','オーナーが承認'));
+    c.appendChild(r);});
   app.appendChild(c);
   c=card('有給');
   d.leave.forEach(x=>{const r=row(x.name,'残 '+(x.remain===''?'-':x.remain)+'日'+(x.deadline?'／期限 '+x.deadline:'')+(x.memo?'／'+x.memo:''),x.judge,'tag');const t=r.lastChild;t.style.background=x.color;t.style.whiteSpace='normal';t.style.maxWidth='55%';t.style.textAlign='right';c.appendChild(r);});
   app.appendChild(c);
+  renderHistory(app,d);
   buildExport(d.todayList.map(x=>x.name));
+}
+let DATA=null;
+function canEdit(n){return !!(DATA&&DATA.editable&&DATA.editable.indexOf(n)>=0);}
+function md(dt){const p=String(dt).split('/');return p.length===3?Number(p[1])+'/'+Number(p[2]):dt;}
+function errText(e){return /fetch|JSON|Load/i.test(e.message)?'通信できませんでした。もう一度押してください':e.message;}
+function renderPending(app,d){
+  const list=d.pending||[];
+  const c=card(list.length?'承認待ち '+list.length+' 件':'承認待ちはありません');c.classList.add('pend');if(!list.length)c.classList.add('none');
+  list.forEach(p=>{const it=el('div','pi');
+    const title=p.type==='有給'?(p.name+'　有給 '+md(p.date)+'（'+(p.days==0.5?'半日':'1日')+'）'):(p.name+'　打刻の修正 '+md(p.date));
+    it.appendChild(el('b','',title));
+    const sub=p.type==='有給'?('残日数 '+(p.remain===''?'-':p.remain)+(p.remain==='未計算'?'':'日')):('今：'+p.before+'　→　依頼：'+[p.in?'出勤 '+p.in:'',p.out?'退勤 '+p.out:''].filter(Boolean).join('／'));
+    it.appendChild(el('div','sub',sub+(p.note?'　ひとこと：'+p.note:'')+'　（申請 '+p.created+'）'));
+    const ab=el('div','ab');const ok=el('button','ok2','承認');const ng=el('button','ng2',p.type==='有給'?'差し戻し（別の日でお願い）':'差し戻し');
+    const er=el('div','warn');er.style.fontSize='13px';
+    const rs=el('input','rs');rs.placeholder='差し戻しの理由（必須）例）その日は人が足りないため、別の日でお願いします';rs.hidden=true;const send=el('button','ng2','理由を付けて差し戻す');send.hidden=true;
+    ok.onclick=()=>decide(p.id,'approve','',[ok,ng,send],er);
+    ng.onclick=()=>{rs.hidden=false;send.hidden=false;ng.hidden=true;rs.focus();};
+    send.onclick=()=>{if(!rs.value.trim()){er.textContent='理由を書いてください';return;}decide(p.id,'reject',rs.value,[ok,ng,send],er);};
+    ab.appendChild(ok);ab.appendChild(ng);it.appendChild(ab);it.appendChild(rs);it.appendChild(send);it.appendChild(er);c.appendChild(it);});
+  if(d.waitingOwner>0)c.appendChild(el('div','sub','このほか、責任者本人の申請が '+d.waitingOwner+' 件、オーナーの承認待ちです。'));
+  app.appendChild(c);
+}
+function decide(id,action,reason,btns,er){btns.forEach(b=>b.disabled=true);er.textContent='';
+  call('decideRequest',[AKEY,id,action,reason]).then(()=>load(YM)).catch(e=>{er.textContent=errText(e);btns.forEach(b=>b.disabled=false);});}
+function renderFixForm(app,d){
+  if(!d.editable||!d.editable.length)return;
+  const c=card('打刻の修正');c.id='fixCard';
+  const fx=el('div','fx');
+  const g=el('div','g2');
+  const l1=el('div');l1.appendChild(el('label','','人'));const sel=el('select');sel.id='fxName';d.editable.forEach(n=>{const o=el('option','',n);o.value=n;sel.appendChild(o);});l1.appendChild(sel);
+  const l2=el('div');l2.appendChild(el('label','','日付'));const dt=el('input');dt.type='date';dt.id='fxDate';const t=new Date();dt.value=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');dt.max=dt.value;l2.appendChild(dt);
+  g.appendChild(l1);g.appendChild(l2);fx.appendChild(g);
+  const ld=el('button','btn','この日を読み込む');ld.style.marginTop='10px';ld.onclick=loadDay;fx.appendChild(ld);
+  const ed=el('div');ed.id='fxEdit';ed.hidden=true;
+  ed.appendChild(el('div','sub','')).id='fxNow';
+  const g2=el('div','g2');
+  const a=el('div');a.appendChild(el('label','','出勤'));const i1=el('input');i1.type='time';i1.id='fxIn';a.appendChild(i1);
+  const b=el('div');b.appendChild(el('label','','退勤'));const i2=el('input');i2.type='time';i2.id='fxOut';b.appendChild(i2);
+  g2.appendChild(a);g2.appendChild(b);ed.appendChild(g2);
+  const ck=el('label','chk');ck.style.marginTop='10px';const cb=el('input');cb.type='checkbox';cb.id='fxAp';ck.appendChild(cb);ck.appendChild(document.createTextNode('早出を承認する（打刻時刻から実働に入れる）'));ed.appendChild(ck);
+  ed.appendChild(el('div','sub','退勤が日をまたぐ時は時刻だけでOK（例 1:30＝翌1:30）。退勤を空にすると退勤なしに、出勤も退勤も空にするとその日の記録を消します。直した内容は「修正履歴」に残ります。'));
+  const sv=el('button','btn','保存する');sv.style.marginTop='10px';sv.onclick=saveFix;ed.appendChild(sv);
+  const er=el('div','sub');er.id='fxMsg';er.style.marginTop='6px';ed.appendChild(er);
+  fx.appendChild(ed);c.appendChild(fx);app.appendChild(c);
+}
+function openFixForm(name,date){const s=document.getElementById('fxName');if(!s)return;s.value=name;document.getElementById('fxDate').value=date.replace(/\//g,'-');document.getElementById('fixCard').scrollIntoView({behavior:'smooth'});loadDay();}
+function fxMsg(t,bad){const m=document.getElementById('fxMsg');m.textContent=t;m.className=bad?'warn':'sub';}
+function loadDay(){const n=document.getElementById('fxName').value,dt=document.getElementById('fxDate').value.replace(/-/g,'/');
+  const ed=document.getElementById('fxEdit');ed.hidden=true;
+  call('adminGetDay',[AKEY,n,dt]).then(r=>{ed.hidden=false;document.getElementById('fxNow').textContent='今の記録：'+(r.exists?('出勤 '+(r.in||'-')+'／退勤 '+(r.out||'-')+(r.note?'　'+r.note:'')):'記録なし');
+    document.getElementById('fxIn').value=r.in||'';document.getElementById('fxOut').value=(r.out||'').replace('翌','');document.getElementById('fxAp').checked=!!r.approve;fxMsg('');})
+  .catch(e=>{alertBox(errText(e));});}
+function alertBox(t){const ed=document.getElementById('fxEdit');ed.hidden=false;document.getElementById('fxNow').textContent='';fxMsg(t,true);}
+function saveFix(){const n=document.getElementById('fxName').value,dt=document.getElementById('fxDate').value.replace(/-/g,'/');
+  const i=document.getElementById('fxIn').value,o=document.getElementById('fxOut').value,ap=document.getElementById('fxAp').checked;
+  fxMsg('保存中...');call('adminFix',[AKEY,n,dt,i,o,ap]).then(r=>{fxMsg('保存しました：'+(r.exists?('出勤 '+(r.in||'-')+'／退勤 '+(r.out||'-')):'記録なし'));setTimeout(()=>load(YM),700);}).catch(e=>fxMsg(errText(e),true));}
+function approveEarly(n,dt,b){b.disabled=true;call('adminFix',[AKEY,n,dt,null,null,true]).then(()=>load(YM)).catch(e=>{b.disabled=false;b.textContent=errText(e);});}
+function renderHistory(app,d){
+  const c=card('修正履歴（新しい順・最大30件）');
+  if(!d.history||!d.history.length)c.appendChild(el('div','empty','まだありません'));
+  (d.history||[]).forEach(x=>{const r=el('div','hist');r.appendChild(el('div','',x.at.slice(0,16)+'　'+x.by+' → '+x.name+'（'+x.date+'）'));
+    r.appendChild(el('div','sub',x.what+(x.before||x.after?'：'+(x.before||'-')+' → '+(x.after||'-'):'')+'　['+x.via+']'));c.appendChild(r);});
+  app.appendChild(c);
 }
 const COLS=[['date','日付'],['name','氏名'],['company','会社'],['kubun','区分'],['in','出勤'],['out','退勤'],['brk','休憩(h)'],['work','実働(h)'],['otD','時間外_日8h超(h)'],['otW','時間外_週40h超(h)'],['hol','休日労働_日曜(h)'],['night','深夜_22-5時(h)'],['leave','有給(日)'],['approve','早出承認'],['note','備考']];
 const NUMS=['brk','work','otD','otW','hol','night','leave'];

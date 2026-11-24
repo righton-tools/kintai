@@ -15,6 +15,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="dakoku-180.png">
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  [hidden]{display:none!important}
   html,body{height:100%}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;background:#eef1f5;color:#1c2330}
   .top{background:linear-gradient(135deg,#1b2a4a,#0f7c8c);color:#fff;padding:calc(env(safe-area-inset-top,0px) + 22px) 20px 54px;text-align:center;border-radius:0 0 28px 28px}
@@ -39,6 +40,35 @@
   .status div:first-child{border-top:0}
   .status b{color:#7a8494;font-weight:500}
   .status span{font-weight:700;font-variant-numeric:tabular-nums}
+  .alert{display:block;background:linear-gradient(135deg,#f08c2e,#e4572e);color:#fff;border-radius:16px;padding:14px 16px;margin-bottom:12px;text-decoration:none;font-weight:700;font-size:16px;box-shadow:0 6px 16px rgba(228,87,46,.35)}
+  .alert small{display:block;font-weight:500;font-size:12px;opacity:.9;margin-top:2px}
+  .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 14px}
+  .act{border:1px solid #cfd6e0;background:#fff;color:#1c2330;border-radius:14px;padding:13px 6px;font-size:14px;font-weight:700;font-family:inherit}
+  .act:active{background:#f1f4f8}
+  .fixlink{display:block;margin:-6px auto 12px;border:0;background:none;color:#0f7c8c;font-weight:700;font-size:14px;text-decoration:underline;font-family:inherit}
+  .reqs{background:#fff;border-radius:16px;padding:6px 16px;margin-top:14px;box-shadow:0 4px 14px rgba(20,40,80,.06)}
+  .reqs h3{font-size:13px;color:#7a8494;margin:10px 0 4px;font-weight:600}
+  .rq{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid #eef0f3;font-size:14px}
+  .rq small{display:block;color:#7a8494;font-size:12px;margin-top:2px}
+  .rq .r{color:#c5221f}
+  .st{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .st-w{background:#fff1e3;color:#c25b0a}.st-o{background:#e6f4ea;color:#137333}.st-n{background:#fde2e1;color:#b3261e}.st-c{background:#eceff3;color:#6b7280}
+  .mini{border:0;background:none;color:#7a8494;text-decoration:underline;font-size:12px;font-family:inherit;padding:2px}
+  .ov{position:fixed;inset:0;background:rgba(15,20,30,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+  .pn{background:#fff;width:100%;max-width:480px;border-radius:22px 22px 0 0;padding:20px 18px calc(env(safe-area-inset-bottom,0px) + 18px)}
+  .pn h2{margin:0 0 12px;font-size:18px}
+  .fl{display:block;font-size:13px;color:#59626f;font-weight:600;margin:10px 0 4px}
+  .pn input[type=date],.pn input[type=time],.pn input[type=text]{width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1px solid #cfd6e0;border-radius:12px;background:#fff}
+  .seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .seg label{border:1px solid #cfd6e0;border-radius:12px;padding:10px;text-align:center;font-weight:700}
+  .seg input{display:none}.seg input:checked+span{color:#0f7c8c}
+  .seg label:has(input:checked){border-color:#0f7c8c;background:#e7f6f6}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hint{font-size:12px;color:#7a8494;margin:8px 0 0;line-height:1.5}
+  .pbtn{display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:16px}
+  .pbtn button{border:0;border-radius:14px;padding:14px;font-size:16px;font-weight:700;font-family:inherit}
+  .cancel{background:#eceff3;color:#3b4350}.go{background:linear-gradient(135deg,#17a2a0,#1fbf9c);color:#fff}
+  .perr{color:#c5221f;font-weight:700;font-size:14px;margin-top:10px;min-height:18px}
 </style>
 </head>
 <body>
@@ -49,19 +79,27 @@
   <p class="date" id="date"></p>
 </div>
 <div class="wrap">
+  <a class="alert" id="alert" hidden></a>
   <div class="who" id="who">確認中...<small></small></div>
   <div class="btns">
     <button class="btn in" id="btnIn" onclick="punch('出勤')">出勤</button>
     <button class="btn out" id="btnOut" onclick="punch('退勤')">退勤</button>
   </div>
   <div class="msg" id="msg"></div>
+  <button class="fixlink" id="fixlink" hidden>この日の修正を依頼する</button>
+  <div class="acts">
+    <button class="act" id="btnLeave" onclick="openLeave()">有給を申請</button>
+    <button class="act" id="btnFix" onclick="openFix()">打刻の修正を依頼</button>
+  </div>
   <div class="status">
     <div><b>日付</b><span id="sDate">-</span></div>
     <div><b>出勤</b><span id="sIn">-</span></div>
     <div><b>退勤</b><span id="sOut">-</span></div>
     <div><b>実働</b><span id="sHours">-</span></div>
   </div>
+  <div class="reqs" id="reqs" hidden><h3>自分の申請</h3><div id="reqList"></div></div>
 </div>
+<div class="ov" id="ov" hidden><div class="pn" id="pn"></div></div>
 <script>
   const API='https://script.google.com/macros/s/AKfycbwO-QQFeXJoUUeC4ZLf7Hy2Kvh9sF6n8Qg1gIQev7nVemzRhZHTqj_hLs7SoEWgXA8Y/exec';
   const $=id=>document.getElementById(id);
@@ -80,25 +118,72 @@
   function tick(){const n=new Date();$('clock').textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
     $('date').textContent=n.getFullYear()+'年'+(n.getMonth()+1)+'月'+n.getDate()+'日（'+wd[n.getDay()]+'）';}
   tick();setInterval(tick,10000);
-  function setBusy(b){$('btnIn').disabled=b;$('btnOut').disabled=b;}
+  function setBusy(b){['btnIn','btnOut','btnLeave','btnFix'].forEach(i=>$(i).disabled=b);}
   function show(s){$('sDate').textContent=s.date||'-';$('sIn').textContent=s.in||'-';$('sOut').textContent=s.out||'-';$('sHours').textContent=s.hours?s.hours+' 時間':'-';}
   function msg(t,ok){const m=$('msg');m.textContent=t;m.className='msg '+(ok?'ok':'ng');}
   function setWho(name,sub){const w=$('who');w.textContent=name;const s=document.createElement('small');s.textContent=sub;w.appendChild(s);}
   async function punch(type){
     if(!KEY){msg('本人用のQRから開いてください',false);return;}
     setBusy(true);msg('送信中...',true);
-    try{const r=await api('punch',[KEY,type]);msg(type+'を記録しました（'+r.time+'）',true);show(r);}
-    catch(e){msg(e.message,false);}
+    try{const r=await api('punch',[KEY,type]);msg(type+'を記録しました（'+r.time+'）',true);show(r);fixLink('');}
+    catch(e){msg(e.message,false);const m=e.message.match(/(\d{4}\/\d{2}\/\d{2})/);if(/またがって/.test(e.message)&&m)fixLink(m[1]);}
     setBusy(false);
   }
   async function init(){
     setBusy(true);
     if(!KEY){setWho('—','本人確認できません');msg('本人用のQRから開いてください',false);return;}
-    try{const me=await api('getMe',[KEY]);setWho(me.name,(me.company?me.company+'　':'')+me.kubun);show(me);setBusy(false);if(me.warn)msg(me.warn,false);if(me.admin){const s=$('sw');s.href='admin.html?k='+KEY;s.hidden=false;}}
+    try{const me=await api('getMe',[KEY]);setWho(me.name,(me.company?me.company+'　':'')+me.kubun);applyMe(me);setBusy(false);if(me.warn){msg(me.warn,false);fixLink(me.openDate||'');}if(me.admin){const s=$('sw');s.href='admin.html?k='+KEY;s.hidden=false;}}
     catch(e){setWho('—','本人確認できません');msg(e.message,false);}
   }
   init();
-  document.addEventListener('visibilitychange',()=>{ if(!document.hidden){tick(); if(KEY) api('getMe',[KEY]).then(me=>{show(me);if(me.warn)msg(me.warn,false);}).catch(()=>{});} });
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden){tick(); if(KEY) api('getMe',[KEY]).then(me=>{applyMe(me);if(me.warn){msg(me.warn,false);fixLink(me.openDate||'');}}).catch(()=>{});} });
+  let ME=null;
+  function E(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
+  function md(d){const p=String(d).split('/');return p.length===3?Number(p[1])+'/'+Number(p[2]):d;}
+  function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function applyMe(me){ME=me;show(me);
+    const a=$('alert');
+    if(me.admin&&me.pending>0){a.textContent='承認待ちが '+me.pending+' 件あります　確認する ▶';const s=E('small','', '有給の申請・打刻の修正依頼が届いています');a.appendChild(s);a.href='admin.html?k='+KEY;a.hidden=false;}else{a.hidden=true;}
+    renderReqs(me.requests||[]);}
+  function fixLink(date){const b=$('fixlink');if(!date){b.hidden=true;return;}b.textContent=md(date)+' の退勤の修正を依頼する';b.onclick=()=>openFix(date);b.hidden=false;}
+  function renderReqs(list){const box=$('reqList');box.innerHTML='';$('reqs').hidden=!list.length;
+    const cls={'承認待ち':'st-w','承認':'st-o','差し戻し':'st-n','取り消し':'st-c'};
+    list.forEach(r=>{const row=E('div','rq');const l=E('div');
+      const what=r.type==='有給'?('有給 '+md(r.date)+'（'+(r.days==0.5?'半日':'1日')+'）'):('打刻修正 '+md(r.date)+'（'+[r.in?'出勤'+r.in:'',r.out?'退勤'+r.out:''].filter(Boolean).join('・')+'）');
+      l.appendChild(E('div','',what));
+      if(r.status==='差し戻し'&&r.reason){l.appendChild(E('small','r','理由：'+r.reason));}else{l.appendChild(E('small','','申請 '+r.created));}
+      row.appendChild(l);const rt=E('div');rt.style.textAlign='right';rt.appendChild(E('span','st '+(cls[r.status]||'st-c'),r.status));
+      if(r.status==='承認待ち'){const c=E('button','mini','取り消す');c.onclick=()=>cancelReq(r.id);rt.appendChild(E('br'));rt.appendChild(c);}
+      row.appendChild(rt);box.appendChild(row);});}
+  async function cancelReq(id){try{const r=await api('cancelRequest',[KEY,id]);renderReqs(r.requests);msg('申請を取り消しました',true);}catch(e){msg(e.message,false);}}
+  function panel(title,body,goLabel,onGo){const pn=$('pn');pn.innerHTML='';pn.appendChild(E('h2','',title));pn.appendChild(body);
+    const er=E('div','perr');er.id='perr';pn.appendChild(er);
+    const b=E('div','pbtn');const c=E('button','cancel','やめる');c.onclick=closePanel;const g=E('button','go',goLabel);
+    g.onclick=async()=>{g.disabled=true;er.textContent='';try{await onGo();}catch(e){er.textContent=/fetch|JSON|Load/i.test(e.message)?'通信できませんでした。もう一度押してください':e.message;}g.disabled=false;};
+    b.appendChild(c);b.appendChild(g);pn.appendChild(b);$('ov').hidden=false;}
+  function closePanel(){$('ov').hidden=true;}
+  $('ov').addEventListener('click',e=>{if(e.target===$('ov'))closePanel();});
+  function field(label,el){const w=E('div');w.appendChild(E('label','fl',label));w.appendChild(el);return w;}
+  function inp(type,val,ph){const i=E('input');i.type=type;if(val)i.value=val;if(ph)i.placeholder=ph;return i;}
+  function openLeave(){if(!KEY)return;
+    const body=E('div');const t=new Date();t.setDate(t.getDate()+1);
+    const d=inp('date',iso(t));body.appendChild(field('休む日',d));
+    const seg=E('div','seg');[['1','1日'],['0.5','半日']].forEach((x,i)=>{const l=E('label');const r=inp('radio');r.name='days';r.value=x[0];r.checked=i===0;l.appendChild(r);l.appendChild(E('span','',x[1]));seg.appendChild(l);});
+    body.appendChild(field('日数',seg));
+    const n=inp('text','','（書かなくてOK）');n.maxLength=100;body.appendChild(field('ひとこと',n));
+    body.appendChild(E('p','hint','申請は上司に届きます。承認されると有給として登録されます。'));
+    panel('有給を申請',body,'申請する',async()=>{const days=document.querySelector('input[name=days]:checked').value;
+      const r=await api('requestLeave',[KEY,d.value.replace(/-/g,'/'),Number(days),n.value]);closePanel();renderReqs(r.requests);msg('有給を申請しました（'+md(d.value.replace(/-/g,'/'))+'）',true);});}
+  function openFix(date){if(!KEY)return;
+    const body=E('div');const today=iso(new Date());const dv=date?date.replace(/\//g,'-'):today;
+    const d=inp('date',dv);d.max=today;body.appendChild(field('直したい日',d));
+    const two=E('div','two');const isToday=dv===today&&ME;
+    const i1=inp('time',isToday&&ME.in?ME.in:'');const i2=inp('time',isToday&&ME.out?ME.out:'');
+    two.appendChild(field('正しい出勤',i1));two.appendChild(field('正しい退勤',i2));body.appendChild(two);
+    const n=inp('text','','例）退勤を押し忘れました');n.maxLength=100;body.appendChild(field('ひとこと',n));
+    body.appendChild(E('p','hint','直したい方だけ入れてOK（変えない方は空欄のまま）。日をまたいだ退勤は、そのまま時刻を入れてください（例 1:30）。依頼は上司に届き、承認されると直ります。'));
+    panel('打刻の修正を依頼',body,'依頼する',async()=>{
+      const r=await api('requestFix',[KEY,d.value.replace(/-/g,'/'),i1.value,i2.value,n.value]);closePanel();renderReqs(r.requests);fixLink('');msg('修正を依頼しました（'+md(d.value.replace(/-/g,'/'))+'）',true);});}
 </script>
 </body>
 </html>
