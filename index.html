@@ -125,18 +125,27 @@
   async function punch(type){
     if(!KEY){msg('本人用のQRから開いてください',false);return;}
     setBusy(true);msg('送信中...',true);
-    try{const r=await api('punch',[KEY,type]);msg(type+'を記録しました（'+r.time+'）',true);show(r);fixLink('');}
+    GEN++;
+    try{const r=await api('punch',[KEY,type]);msg(type+'を記録しました（'+r.time+'）',true);show(r);fixLink('');if(ME){ME=Object.assign({},ME,{date:r.date||ME.date,in:r.in,out:r.out,hours:r.hours,warn:'',openDate:''});saveMe(ME);}}
     catch(e){msg(e.message,false);const m=e.message.match(/(\d{4}\/\d{2}\/\d{2})/);if(/またがって/.test(e.message)&&m)fixLink(m[1]);}
     setBusy(false);
   }
+  // 起動を速くする：前回の表示をすぐ出して、最新は裏で取りに行く（記録そのものは毎回サーバーで確認）
+  let GEN=0;
+  const CK=()=>'kintai_me_'+KEY;
+  function saveMe(me){try{localStorage.setItem(CK(),JSON.stringify(me));}catch(e){}}
+  function todayStr(){const n=new Date();return n.getFullYear()+'/'+String(n.getMonth()+1).padStart(2,'0')+'/'+String(n.getDate()).padStart(2,'0');}
+  function paintMe(me){setWho(me.name,(me.company?me.company+'　':'')+me.kubun);applyMe(me);if(me.admin){const s=$('sw');s.href='admin.html?k='+KEY;s.hidden=false;}}
+  async function refresh(){const g=GEN;const me=await api('getMe',[KEY]);if(g!==GEN)return;paintMe(me);saveMe(me);setBusy(false);if(me.warn){msg(me.warn,false);fixLink(me.openDate||'');}}
   async function init(){
     setBusy(true);
     if(!KEY){setWho('—','本人確認できません');msg('本人用のQRから開いてください',false);return;}
-    try{const me=await api('getMe',[KEY]);setWho(me.name,(me.company?me.company+'　':'')+me.kubun);applyMe(me);setBusy(false);if(me.warn){msg(me.warn,false);fixLink(me.openDate||'');}if(me.admin){const s=$('sw');s.href='admin.html?k='+KEY;s.hidden=false;}}
-    catch(e){setWho('—','本人確認できません');msg(e.message,false);}
+    let c=null;try{c=JSON.parse(localStorage.getItem(CK())||'null');}catch(e){}
+    if(c&&c.name){if(c.date!==todayStr())c=Object.assign({},c,{date:todayStr(),in:'',out:'',hours:'',warn:'',openDate:''});paintMe(c);setBusy(false);}
+    try{await refresh();}
+    catch(e){if(!(c&&c.name))setWho('—','本人確認できません');msg(e.message,false);}
   }
-  init();
-  document.addEventListener('visibilitychange',()=>{ if(!document.hidden){tick(); if(KEY) api('getMe',[KEY]).then(me=>{applyMe(me);if(me.warn){msg(me.warn,false);fixLink(me.openDate||'');}}).catch(()=>{});} });
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden){tick(); if(KEY) refresh().catch(()=>{});} });
   let ME=null;
   function E(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e;}
   function md(d){const p=String(d).split('/');return p.length===3?Number(p[1])+'/'+Number(p[2]):d;}
@@ -184,6 +193,7 @@
     body.appendChild(E('p','hint','直したい方だけ入れてOK（変えない方は空欄のまま）。日をまたいだ退勤は、そのまま時刻を入れてください（例 1:30）。依頼は上司に届き、承認されると直ります。'));
     panel('打刻の修正を依頼',body,'依頼する',async()=>{
       const r=await api('requestFix',[KEY,d.value.replace(/-/g,'/'),i1.value,i2.value,n.value]);closePanel();renderReqs(r.requests);fixLink('');msg('修正を依頼しました（'+md(d.value.replace(/-/g,'/'))+'）',true);});}
+  init();
 </script>
 </body>
 </html>

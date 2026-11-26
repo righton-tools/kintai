@@ -236,9 +236,11 @@ function load(ym){
   const app=document.getElementById('app');
   if(!AKEY){app.innerHTML='';app.appendChild(el('div','err','管理者用のリンクから開いてください'));return;}
   document.getElementById('now').textContent='読み込み中...';
+  const CK='kintai_adm_'+AKEY; let shown=false;
+  if(!ym){try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(c&&c.ym){render(c);shown=true;document.getElementById('now').textContent=c.now+' 時点（更新中...）';}}catch(e){}}
   fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'getAdminData',args:[AKEY,ym||'']}),redirect:'follow'})
-    .then(r=>r.json()).then(j=>{ if(!j.ok) throw new Error(j.error||'エラーが起きました'); render(j.data); })
-    .catch(e=>{app.innerHTML='';app.appendChild(el('div','err',(e&&e.message&&!/fetch|JSON|Load/i.test(e.message))?e.message:'通信できませんでした。電波を確認して開き直してください'));document.getElementById('now').textContent='';});
+    .then(r=>r.json()).then(j=>{ if(!j.ok) throw new Error(j.error||'エラーが起きました'); render(j.data); if(!ym){try{localStorage.setItem(CK,JSON.stringify(j.data));}catch(e){}} })
+    .catch(e=>{if(shown){document.getElementById('now').textContent='通信できませんでした（前回の表示です）';return;}app.innerHTML='';app.appendChild(el('div','err',(e&&e.message&&!/fetch|JSON|Load/i.test(e.message))?e.message:'通信できませんでした。電波を確認して開き直してください'));document.getElementById('now').textContent='';});
 }
 load('');
 </script>
